@@ -9,8 +9,7 @@
     "homegear.coffee",
     "README.md",
     "homegear-config-schema.coffee",
-    "device-config-schema.coffee",
-    "homegear-ws.js"
+    "device-config-schema.coffee"
   ],
   "version": "0.1.0",
   "dependencies": {
@@ -19,6 +18,15 @@
     "uuid": "^3.1.0",
     "ws": "^3.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": https://github.com/hei-pa/pimatic-homegear-ws
+  },
+  "keywords": [
+    "node",
+    "homegear",
+    "pimatic"
+  ],
   "peerDependencies": {
     "pimatic": "^0.9.40"
   },

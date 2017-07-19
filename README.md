@@ -25,6 +25,6 @@ Set the `class` attribute to `HomematicSwitch` or `HomematicPowerSwitch`. For ex
   "id": "switch-1",
   "class": "HomematicSwitch",
   "name": "TV Switch",
-  "peerID": 2
+  "peerId": 1
 }
 ```
