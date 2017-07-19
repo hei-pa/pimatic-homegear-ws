@@ -1,0 +1,30 @@
+{
+  "name": "pimatic-homegear-ws",
+  "description": "Plugin to interface devices via Homegear WS.",
+  "author": "Pascal Heinrich <pascalheinrich.de@googlemail.com>",
+  "contributors": [],
+  "main": "homegear.coffee",
+  "files": [
+    "doc",
+    "homegear.coffee",
+    "README.md",
+    "homegear-config-schema.coffee",
+    "device-config-schema.coffee",
+    "homegear-ws.js"
+  ],
+  "version": "0.1.0",
+  "dependencies": {
+    "random-number": "0.0.7",
+    "rxjs": "^5.4.2",
+    "uuid": "^3.1.0",
+    "ws": "^3.0.0"
+  },
+  "peerDependencies": {
+    "pimatic": "^0.9.40"
+  },
+  "configSchema": "homegear-config-schema.coffee",
+  "engines": {
+    "node": ">0.8.x",
+    "npm": ">1.1.x"
+  }
+}
