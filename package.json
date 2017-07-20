@@ -8,6 +8,7 @@
     "doc",
     "homegear.coffee",
     "README.md",
+    "spreadSubject.js",
     "homegear-config-schema.coffee",
     "device-config-schema.coffee"
   ],
