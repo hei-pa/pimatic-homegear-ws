@@ -109,8 +109,8 @@ module.exports = (env) ->
       @id = @config.id;
       super();
 
-      env.logger.debug('LastState:', !!@lastState.state.value);
-      @_state = !!@lastState.state.value;
+      env.logger.debug('LastState:', !!@lastState?.state?.value);
+      @_state = !!@lastState?.state?.value;
 
       homegear.subscribePeer(@config.peerId);
       homegear.onNotification(@config.peerId).subscribe((notification) =>
@@ -174,8 +174,8 @@ module.exports = (env) ->
       @id = @config.id;
       super();
 
-      env.logger.debug('LastState:', !!@lastState.state.value);
-      @_state = !!@lastState.state.value;
+      env.logger.debug('LastState:', !!@lastState?.state?.value);
+      @_state = !!@lastState?.state?.value;
 
       homegear.subscribePeer(@config.peerId);
       homegear.onNotification(@config.peerId).subscribe((notification) =>
