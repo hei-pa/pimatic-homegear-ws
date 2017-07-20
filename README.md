@@ -28,3 +28,11 @@ Set the `class` attribute to `HomematicSwitch` or `HomematicPowerSwitch`. For ex
   "peerId": 1
 }
 ```
+```json
+{
+  "id": "power-switch-1",
+  "class": "HomematicPowerSwitch",
+  "name": "Light Power Switch",
+  "peerId": 2
+}
+```
