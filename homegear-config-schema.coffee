@@ -10,6 +10,14 @@ module.exports = {
       description: "Homegear port (Default: 2001)"
       type: "integer"
       default: 2001
+    username:
+      description: "Homegear username"
+      type: "string"
+      default: ""
+    password:
+      description: "Homegear password"
+      type: "string"
+      default: ""
     debug:
       description: "Output update message from homegear and additional infos"
       type: "boolean"

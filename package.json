@@ -3,12 +3,12 @@
   "description": "Plugin to interface devices via Homegear WS.",
   "author": "Pascal Heinrich <pascalheinrich.de@googlemail.com>",
   "contributors": [],
-  "main": "homegear.coffee",
+  "main": "index.coffee",
   "files": [
     "doc",
-    "homegear.coffee",
+    "index.coffee",
+    "homegear.js",
     "README.md",
-    "spreadSubject.js",
     "homegear-config-schema.coffee",
     "device-config-schema.coffee"
   ],
