@@ -10,6 +10,8 @@ You can load the plugin by editing your `config.json` to include (host = Homegea
 ````json
 {
    "plugin": "homegear-ws",
+	 "username": "your-username", (blank string if auth none)
+   "password": "your-password", (blank string if auth none)
    "host": "127.0.0.1",
    "port": 2001
 }
