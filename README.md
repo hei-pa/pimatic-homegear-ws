@@ -10,8 +10,8 @@ You can load the plugin by editing your `config.json` to include (host = Homegea
 ````javascript
 {
    "plugin": "homegear-ws",
-	 "username": "your-username", (blank string if auth none)
-   "password": "your-password", (blank string if auth none)
+   "username": "your-username", //(blank string if auth none)
+   "password": "your-password", //(blank string if auth none)
    "host": "127.0.0.1",
    "port": 2001
 }
@@ -22,7 +22,7 @@ Use the debug output in pimatic to find out the peerId and channel of the device
 Switches can be defined by adding them to the `devices` section in the config file.
 Set the `class` attribute to `HomematicSwitch` or `HomematicPowerSwitch`. For example:
 
-```json
+```javascript
 {
   "id": "switch-1",
   "class": "HomematicSwitch",
@@ -30,7 +30,7 @@ Set the `class` attribute to `HomematicSwitch` or `HomematicPowerSwitch`. For ex
   "peerId": 1
 }
 ```
-```json
+```javascript
 {
   "id": "power-switch-1",
   "class": "HomematicPowerSwitch",
