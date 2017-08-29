@@ -7,7 +7,7 @@ Configuration
 -------------
 You can load the plugin by editing your `config.json` to include (host = Homegear IP port=Homegear Port (default:2001)).
 
-````json
+````javascript
 {
    "plugin": "homegear-ws",
 	 "username": "your-username", (blank string if auth none)
