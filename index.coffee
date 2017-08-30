@@ -1,7 +1,6 @@
 module.exports = (env) ->
 
-  deviceConfigDef = require("./device-config-schema");
-
+  DeviceConfigDef = require("./device-config-schema");
   Homegear = require('./homegear')(env);
   Rx = require('rxjs');
 
@@ -12,14 +11,185 @@ module.exports = (env) ->
       Homegear.connect(@config.host, @config.port, @config.username, @config.password);
 
       @framework.deviceManager.registerDeviceClass("HomematicSwitch", {
-        configDef: deviceConfigDef.HomematicSwitch,
+        configDef: DeviceConfigDef.HomematicSwitch,
         createCallback: (config, lastState) => new HomematicSwitch(config, lastState)
       });
 
       @framework.deviceManager.registerDeviceClass("HomematicPowerSwitch", {
-        configDef: deviceConfigDef.HomematicPowerSwitch,
+        configDef: DeviceConfigDef.HomematicPowerSwitch,
         createCallback: (config, lastState) => new HomematicPowerSwitch(config, lastState)
       });
+
+      @framework.deviceManager.registerDeviceClass("HomematicThermostat", {
+        configDef: DeviceConfigDef.HomematicThermostat,
+        createCallback: (config, lastState) => new HomematicThermostat(config, lastState)
+      });
+
+  class HomematicThermostat extends env.devices.HeatingThermostat
+
+    attributes:
+      temperatureSetpoint:
+        label: "Temperature Setpoint"
+        description: "The temp that should be set"
+        type: "number"
+        discrete: true
+        unit: "°C"
+      temperature:
+        label: "Actual Temperature"
+        description: "The actual temperature"
+        type: "number"
+        discrete: true
+        unit: "°C"
+      valve:
+        description: "Position of the valve"
+        type: "number"
+        discrete: true
+        unit: "%"
+      mode:
+        description: "The current mode"
+        type: "string"
+        enum: ["auto", "manu", "boost"]
+      battery:
+        description: "Battery Voltage"
+        type: "number"
+        discrete: true
+        unit: "V"
+      synced:
+        description: "Pimatic and thermostat in sync"
+        type: "boolean"
+
+    actions:
+      changeModeTo:
+        params:
+          mode:
+            type: "string"
+      changeTemperatureTo:
+        params:
+          temperatureSetpoint:
+            type: "number"
+
+    template: "thermostat"
+
+    constructor: (@config, @lastState) ->
+      @name = @config.name;
+      @id = @config.id;
+      super();
+
+      Homegear.subscribePeer(@config.peerId);
+      Homegear.onNotification(@config.peerId).subscribe((notification) =>
+        env.logger.debug("Received Notification for #{@config.peerId}: #{JSON.stringify(notification)}");
+        switch notification[3]
+          when "CONTROL_MODE" then @emit("mode", @_mode = @convertModeState(notification[4]));
+          when "BATTERY_STATE" then @emit("battery", @_battery = notification[4]);
+          when "SET_TEMPERATURE" then @emit("temperatureSetpoint", @_temperatureSetpoint = notification[4]);
+          when "ACTUAL_TEMPERATURE" then @emit("temperature", @_temperature = notification[4]);
+          when "VALVE_STATE" then @emit("valve", @_valve = notification[4]);
+      );
+
+      # set last values or request current
+      @_mode = @lastState?.mode?.value || @getMode();
+      @_battery = @lastState?.battery?.value || @getBattery();
+      @_temperatureSetpoint = @lastState?.temperatureSetpoint?.value || @getTemperatureSetpoint();
+      @_temperature = @lastState?.temperature?.value || @getTemperature();
+      @_valve = @lastState?.valve?.value || @getValve();
+      @_synced = true;
+
+    convertModeState: (state) =>
+      switch state
+        when 0 then return "auto"
+        when 1 then return "manu"
+        when 2 then return "party"
+        when 3 then return "boost"
+
+    convertModeStateReverse: (state) =>
+      switch state
+        when "auto" then return 0
+        when "manu" then return 1
+        when "party" then return 2
+        when "boost" then return 3
+
+    getMode: () =>
+      if @_mode? then return Rx.Observable.of(@_mode).toPromise();
+      return Homegear.sendRequest({
+        method: 'getValue',
+        params: [@config.peerId, 4, "CONTROL_MODE"]
+      }).map((response) =>
+        return @_mode = @convertModeState(response.result);
+      ).toPromise();
+
+    getTemperatureSetpoint: () =>
+      if @_temperatureSetpoint? then return Rx.Observable.of(@_temperatureSetpoint).toPromise();
+      return Homegear.sendRequest({
+        method: 'getValue',
+        params: [@config.peerId, 4, "SET_TEMPERATURE"]
+      }).map((response) =>
+        return @_temperatureSetpoint = response.result;
+      ).toPromise();
+
+    getTemperature: () =>
+      if @_temperature? then return Rx.Observable.of(@_temperature).toPromise();
+      return Homegear.sendRequest({
+        method: 'getValue',
+        params: [@config.peerId, 4, "ACTUAL_TEMPERATURE"]
+      }).map((response) =>
+        return @_temperature = response.result;
+      ).toPromise();
+
+    getValve: () =>
+      if @_valve? then return Rx.Observable.of(@_valve).toPromise();
+      return Homegear.sendRequest({
+        method: 'getValue',
+        params: [@config.peerId, 4, "VALVE_STATE"]
+      }).map((response) =>
+        return @_valve = response.result;
+      ).toPromise();
+
+    getBattery: =>
+      if @_battery? then return Rx.Observable.of(@_battery).toPromise();
+      return Homegear.sendRequest({
+        method: 'getValue',
+        params: [@config.peerId, 4, "BATTERY_STATE"]
+      }).map((response) =>
+        return @_battery = response.result;
+      ).toPromise();
+
+    changeModeTo: (mode) ->
+      if @_mode is mode then return Rx.Observable.of(@_mode).toPromise();
+      @_synced = false;
+
+      # set default to auto
+      params = [@config.peerId, 4, "AUTO_MODE", true];
+
+      switch mode
+        when "auto" then params = [@config.peerId, 4, "AUTO_MODE", true]
+        when "manu" then params = [@config.peerId, 4, "MANU_MODE", @_temperatureSetpoint]
+        when "party" then params = [@config.peerId, 4, "PARTY_MODE_SUBMIT", true]
+        when "boost" then params = [@config.peerId, 4, "BOOST_MODE", true]
+
+      return Homegear.sendRequest({
+        method: 'setValue',
+        params: params
+      }).map((response) =>
+        @_synced = true;
+        @emit("mode", @_mode = mode);
+        return @_mode;
+      ).toPromise();
+
+    changeTemperatureTo: (temperatureSetpoint) ->
+      if @_temperatureSetpoint is temperatureSetpoint then return Rx.Observable.of(@_temperatureSetpoint).toPromise();
+      @_synced = false;
+      return Homegear.sendRequest({
+        method: 'setValue',
+        params: [@config.peerId, 4, "SET_TEMPERATURE", temperatureSetpoint]
+      }).map((response) =>
+        @_synced = true;
+        @emit("temperatureSetpoint", @_temperatureSetpoint = temperatureSetpoint);
+        return @_temperatureSetpoint;
+      ).toPromise();
+
+    destroy: () =>
+      env.logger.debug('Destroy HomematicThermostat');
+      super();
 
   class HomematicSwitch extends env.devices.PowerSwitch
 
@@ -34,8 +204,8 @@ module.exports = (env) ->
       @id = @config.id;
       super();
 
-      env.logger.debug("#{@name} [#{@id}] LastState: ", !!@lastState?.state?.value);
-      @_state = !!@lastState?.state?.value;
+      # set last values or request current
+      @_state = !!@lastState?.state?.value || @getState();
 
       Homegear.subscribePeer(@config.peerId);
       Homegear.onNotification(@config.peerId).subscribe((notification) =>
@@ -100,8 +270,13 @@ module.exports = (env) ->
       @id = @config.id;
       super();
 
-      env.logger.debug("#{@name} [#{@id}] LastState: ", !!@lastState?.state?.value);
-      @_state = !!@lastState?.state?.value;
+      # set last values or request current
+      @_state = !!@lastState?.state?.value || @getState();
+      @_voltage = @lastState?.voltage?.value || @getVoltage();
+      @_current = @lastState?.current?.value || @getCurrent();
+      @_frequency = @lastState?.frequency?.value || @getFrequency();
+      @_energy = @lastState?.energy?.value || @getEnergy();
+      @_power = @lastState?.power?.value || @getPower();
 
       Homegear.subscribePeer(@config.peerId);
       Homegear.onNotification(@config.peerId).subscribe((notification) =>

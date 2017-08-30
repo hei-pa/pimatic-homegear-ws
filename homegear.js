@@ -152,7 +152,7 @@ module.exports = (env) => {
 
     onNotification: (peerId) => {
 
-      return clientSocket.filter((message) => {
+      return serverSocket.filter((message) => {
         return message.method == "event" && message.params && message.params[1] == peerId;
       }).map((notification) => {
         return notification.params;
