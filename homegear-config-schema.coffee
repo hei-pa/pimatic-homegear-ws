@@ -18,6 +18,14 @@ module.exports = {
       description: "Homegear password"
       type: "string"
       default: ""
+    reconnectInterval:
+      description: "Homegear Reconnect Interval (ms)"
+      type: "number"
+      default: 7500
+    reconnectAttempts:
+      description: "Homegear Reconnect Attempts"
+      type: "number"
+      default: 25
     debug:
       description: "Output update message from homegear and additional infos"
       type: "boolean"

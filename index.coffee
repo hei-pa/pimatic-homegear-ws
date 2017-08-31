@@ -1,14 +1,15 @@
 module.exports = (env) ->
 
   DeviceConfigDef = require("./device-config-schema");
-  Homegear = require('./homegear')(env);
   Rx = require('rxjs');
+
+  Homegear = require('./homegear')(env);
 
   class Homematic extends env.plugins.Plugin
 
     init: (app, @framework, @config) =>
 
-      Homegear.connect(@config.host, @config.port, @config.username, @config.password);
+      Homegear.connect(@config);
 
       @framework.deviceManager.registerDeviceClass("HomematicSwitch", {
         configDef: DeviceConfigDef.HomematicSwitch,

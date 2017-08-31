@@ -1,20 +1,17 @@
 
-WebSocket = require('ws');
-UUID = require('uuid');
-Rx = require('rxjs');
-
-random = require('random-number').generator({
+const Rx = require('rxjs');
+const WebSocket = require('./websocket');
+const random = require('random-number').generator({
   min:  1000000,
   max:  9999999,
   integer: true
 });
 
-homegearId = `Pimatic-${UUID.v4()}`;
 serverSocket = clientSocket = null;
 
 module.exports = (env) => {
 
-  requestSubject = new Rx.ReplaySubject(20).timestamp().scan((acc, curr) => {
+  requestSubject = new Rx.ReplaySubject(100).timestamp().scan((acc, curr) => {
 
     let delay = 0;
     if (acc !== null) {
@@ -32,98 +29,144 @@ module.exports = (env) => {
 
   }, null).mergeMap(i => Rx.Observable.of(i.value).delay(i.delay), undefined, 1);
 
+  let serverConnected = clientConnected = false;
+
   const homegear = {
 
-    connect: (host, port, username, password) => {
+    connect: (config) => {
 
-      const serverOpenObserver = {
-        next: (e) => {
+      env.logger.debug(`Connecting to ${config.host}:${config.port}`);
 
-          env.logger.debug(`Connected to homegear system [${homegearId}]. ${e.target.protocol}`);
+      homegear.connectServer(config);
+      homegear.connectClient(config);
 
-          if(username) {
-            serverSocket.next(JSON.stringify({
-              user: username,
-              password: password
-            }));
+      let requestSubscription;
+      Rx.Observable.zip(serverSocket.connectionStatus, clientSocket.connectionStatus).subscribe((states) => {
+
+        if(states.every((state) => state === (config.username ? "AUTHENTICATED" : "CONNECTED"))) {
+
+          env.logger.debug('Connect request sending.');
+
+          // connect the sending
+          requestSubscription = requestSubject.subscribe((request) => {
+            env.logger.debug(`Sending Request: ${JSON.stringify(request)}`);
+            clientSocket.send(request);
+          });
+
+        } else {
+          if(requestSubscription) {
+            env.logger.debug('Disconnect request sending.');
+            requestSubscription.unsubscribe();
           }
+        }
+
+      });
+
+    },
+
+    connectServer: (config) => {
+
+      serverSocket = WebSocket(env, config, 'client');
+      serverSocket.connectionStatus.subscribe((state) => {
+
+        switch(state) {
+          case "CONNECTED":
+
+            env.logger.debug(`Connected to homegear system [${homegearId}]. Protocol 'client'`);
+
+            if(config.username) {
+              serverSocket.send({
+                user: config.username,
+                password: config.password
+              });
+            }
+
+            break;
+
+          case "DISCONNECTED":
+            env.logger.error(`Connection to homegear system CLOSED. ${serverSocket.url}`);
+            break;
 
         }
-      };
 
-      const clientOpenObserver = {
-        next: (e) => {
-
-          env.logger.debug(`Connected to homegear system [${homegearId}]. ${e.target.protocol}`);
-
-          if(username) {
-            clientSocket.next(JSON.stringify({
-              user: username,
-              password: password
-            }));
-          } else {
-
-            // connect the sending if no username was provied (homegear.webSocketAuthType = none)
-            requestSubject.subscribe((request) => {
-              env.logger.debug(`Sending Request: ${JSON.stringify(request)}`);
-              clientSocket.next(JSON.stringify(request));
-            });
-
-          }
-
-        }
-      };
-
-      env.logger.debug(`Connecting to ${host}:${port}`);
-
-      serverSocket = Rx.Observable.webSocket({
-        url: `ws://${host}:${port}/${homegearId}`,
-        openObserver: serverOpenObserver,
-        WebSocketCtor: WebSocket,
-        protocol: 'client'
       });
 
       // acknowledge all incomming messages
-      serverSocket.subscribe((message) => {
+      serverSocket.catch(val => Rx.Observable.of({error: val})).subscribe((message) => {
 
-        env.logger.debug(`MESSAGE (Client): ${JSON.stringify(message)}`);
+        if("error" in message) {
+          env.logger.error('MESSAGE (Server): ', message.error);
+          return;
+        }
+
+        //env.logger.debug(`MESSAGE (Client): ${JSON.stringify(message)}`);
 
         if(!("auth" in message)) {
-          serverSocket.next("{}");
+          serverSocket.send("{}");
         } else if(message.auth == "success") {
           env.logger.debug('Server authenticated.');
+          serverSocket.connectionObserver.next("AUTHENTICATED");
         } else {
           env.logger.error('Server Authentication failed.');
         }
 
+      }, (err) => {
+        env.logger.error("Server Socket ERROR");
+      }, () => {
+        env.logger.debug("Server Socket COMPLETE");
       });
 
-      clientSocket = Rx.Observable.webSocket({
-        url: `ws://${host}:${port}/${homegearId}`,
-        openObserver: clientOpenObserver,
-        WebSocketCtor: WebSocket,
-        protocol: 'server'
+    },
+
+    connectClient: (config) => {
+
+      clientSocket = WebSocket(env, config, 'server');
+      clientSocket.connectionStatus.subscribe((state) => {
+
+        switch(state) {
+          case "CONNECTED":
+
+            env.logger.debug(`Connected to homegear system [${homegearId}]. Protocol 'server'`);
+
+            if(config.username) {
+              clientSocket.send({
+                user: config.username,
+                password: config.password
+              });
+            }
+
+            break;
+
+          case "DISCONNECTED":
+            env.logger.error(`Connection to homegear system CLOSED. ${clientSocket.url}`);
+            break;
+
+        }
+
       });
 
-      clientSocket.subscribe((message) => {
+      clientSocket.catch(val => Rx.Observable.of({error: val})).subscribe((message) => {
 
-        env.logger.debug(`MESSAGE (Server): ${JSON.stringify(message)}`);
+        if("error" in message) {
+          env.logger.error('MESSAGE (Server): ', message.error);
+          return;
+        }
+
+        //env.logger.debug(`MESSAGE (Server): ${JSON.stringify(message)}`);
 
         if("auth" in message) {
           if(message.auth == 'success') {
             env.logger.debug("Client authenticated.");
-
-            // now connect the sending
-            requestSubject.subscribe((request) => {
-              env.logger.debug(`Sending Request: ${JSON.stringify(request)}`);
-              clientSocket.next(JSON.stringify(request));
-            });
-
+            clientSocket.connectionObserver.next("AUTHENTICATED");
           } else {
             env.logger.error('Client Authentication failed.');
           }
         }
 
+      }, (err) => {
+        env.logger.error("Client Socket ERROR");
+      }, () => {
+        env.logger.debug("Client Socket COMPLETE");
       });
 
     },
@@ -135,7 +178,10 @@ module.exports = (env) => {
 
       requestSubject.next(request);
 
-      return clientSocket.filter((response) => {
+      return clientSocket.catch(val => {
+        env.logger.error(val.toString());
+        return Rx.Observable.empty()
+      }).filter((response) => {
         return response.id == request.id;
       }).first();
 
@@ -152,7 +198,10 @@ module.exports = (env) => {
 
     onNotification: (peerId) => {
 
-      return serverSocket.filter((message) => {
+      return serverSocket.catch(val => {
+        env.logger.error(val.toString());
+        return Rx.Observable.empty()
+      }).filter((message) => {
         return message.method == "event" && message.params && message.params[1] == peerId;
       }).map((notification) => {
         return notification.params;
